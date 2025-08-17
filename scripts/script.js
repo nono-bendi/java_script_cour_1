@@ -1,66 +1,107 @@
+// script.js
 function afficherProposition(proposition) {
-    const zoneProposition = document.querySelector(".zoneProposition");
-    if (!zoneProposition) {
-        console.error("Zone de proposition introuvable.");
-        return;
-    }
-    zoneProposition.innerText = proposition;
+  const zoneProposition = document.querySelector(".zoneProposition");
+  if (!zoneProposition) return console.error("Zone de proposition introuvable.");
+  zoneProposition.innerText = proposition;
 }
 
-function afficherResultat(score, nbMotsProposes) {
-    const spanScore = document.querySelector(".zoneScore span");
-    if (!spanScore) {
-        console.error("Zone de score introuvable.");
-        return;
-    }
-    spanScore.innerText = `${score} / ${nbMotsProposes}`;
+function afficherResultat(score, nbProposes) {
+  const spanScore = document.querySelector(".zoneScore span");
+  if (!spanScore) return console.error("Zone de score introuvable.");
+  spanScore.innerText = `${score} / ${nbProposes}`;
+}
+
+// Normalisation tolérante : minuscules, sans accents, sans ponctuation, espaces réduits
+function normaliser(texte) {
+  return texte
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ") // enlève ponctuation
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Renvoie la liste selon l’option choisie
+function getListeSource() {
+  const radioPhrases = document.getElementById("phrases");
+  return radioPhrases && radioPhrases.checked ? listePhrases : listeMots;
 }
 
 function lancerJeu() {
-    let score = 0;
-    let i = 0;
-    let tempsEcoule = 0; 
-    let intervalId;
+  let score = 0;
+  let i = 0;
+  let tempsEcoule = 0;
+  let intervalId;
 
-    const btnValiderMot = document.getElementById("btnValiderMot");
-    const inputEcriture = document.getElementById("inputEcriture");
-    const chronoSpan = document.getElementById("chrono");
+  const btnValiderMot = document.getElementById("btnValiderMot");
+  const inputEcriture = document.getElementById("inputEcriture");
+  const chronoSpan = document.getElementById("chrono");
+  const radios = document.querySelectorAll("input[name='optionSource']");
 
-    if (!btnValiderMot || !inputEcriture || !chronoSpan) {
-        console.error("Certains éléments nécessaires n'ont pas été trouvés dans le DOM.");
-        return;
-    }
+  if (!btnValiderMot || !inputEcriture || !chronoSpan) {
+    console.error("Éléments manquants dans le DOM.");
+    return;
+  }
+  if (!Array.isArray(listeMots) || !Array.isArray(listePhrases)) {
+    console.error("Listes de données non trouvées.");
+    return;
+  }
 
-    if (!listeMots || listeMots.length === 0) {
-        console.error("La liste des mots est vide ou non définie.");
-        return;
-    }
-
+  function startChrono() {
+    stopChrono();
+    tempsEcoule = 0;
+    chronoSpan.innerText = "0";
     intervalId = setInterval(() => {
-        tempsEcoule++;
-        chronoSpan.innerText = tempsEcoule;
+      tempsEcoule++;
+      chronoSpan.innerText = String(tempsEcoule);
     }, 1000);
+  }
+  function stopChrono() {
+    if (intervalId) clearInterval(intervalId);
+  }
 
-    afficherProposition(listeMots[i]);
+  function resetJeu() {
+    score = 0;
+    i = 0;
+    btnValiderMot.disabled = false;
+    inputEcriture.value = "";
+    afficherResultat(score, i);
+    afficherProposition(getListeSource()[i]);
+    startChrono();
+  }
 
-    btnValiderMot.addEventListener("click", () => {
-        const userInput = inputEcriture.value.trim();
-        if (userInput === listeMots[i]) {
-            score++;
-        }
-        i++;
+  // Démarrage initial
+  resetJeu();
 
-        afficherResultat(score, i);
-        inputEcriture.value = '';
+  // Changer de source (mots/phrases) remet tout à zéro
+  radios.forEach(r =>
+    r.addEventListener("change", () => {
+      resetJeu();
+    })
+  );
 
-        if (i >= listeMots.length) {
-            afficherProposition("Le jeu est fini");
-            btnValiderMot.disabled = true;
-            clearInterval(intervalId);
-        } else {
-            afficherProposition(listeMots[i]);
-        }
-    });
+  btnValiderMot.addEventListener("click", () => {
+    const liste = getListeSource();
+    const proposition = liste[i];
+
+    const saisieNorm = normaliser(inputEcriture.value);
+    const propositionNorm = normaliser(proposition);
+
+    if (saisieNorm && saisieNorm === propositionNorm) {
+      score++;
+    }
+    i++;
 
     afficherResultat(score, i);
+    inputEcriture.value = "";
+
+    if (i >= liste.length) {
+      afficherProposition("Le jeu est fini");
+      btnValiderMot.disabled = true;
+      stopChrono();
+    } else {
+      afficherProposition(liste[i]);
+    }
+  });
 }
